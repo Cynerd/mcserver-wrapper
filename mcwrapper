@@ -1,0 +1,227 @@
+#!/usr/bin/env python3
+import os
+import sys
+import re
+import subprocess
+import datetime
+import signal
+import time
+from threading import Thread
+
+__log_prefix__ = '/home/minecraft/log/'
+__folderprefix__ = '/dev/shm/'
+__folder__ = __folderprefix__
+__players__ = 'players'
+__status__ = 'status'
+__pipe__ = 'input_pipe'
+__log__ = 'none.log'
+
+__STATUSSTRINGS__ = { 0: "Not running",
+		1: "Starting",
+		2: "Running",
+		3: "Stopping"
+		}
+
+def __setfiles__(identifier):
+	global __folder__
+	global __players__
+	global __status__
+	global __pipe__
+	global __log__
+	__folder__ = __folderprefix__ + 'mcwrapper_' + identifier + '/'
+	__players__ = __folder__ + 'players'
+	__status__ = __folder__ + 'status'
+	__pipe__ = __folder__ + 'input_pipe'
+	__log__ = __log_prefix__ + identifier + '/' + \
+		datetime.datetime.now().strftime('%y-%m-%d-%H-%M-%S')
+
+def __user_join__(username):
+	print("User '" + username + "' joined server.")
+	with open(__players__, 'a') as f:
+		f.write(username + '\n')
+
+def __user_leave__(username):
+	print("User '" + username + "' left server.")
+	players = set()
+	with open(__players__) as f:
+		for line in f:
+			pl = line.rstrip()
+			if pl != username:
+				players.add(line.rstrip())
+	with open(__players__, 'w') as f:
+		f.writelines(players)
+		if players:
+			f.write('\n')
+
+
+def __server_init__(identifier):
+	__setfiles__(identifier)
+	__server_clean__() # Clean before execute
+	print("Wrapper initializing with identifier: " + identifier)
+	try:
+		os.mkdir(__folder__)
+	except Exception:
+		pass
+	if os.path.isfile(__status__):
+		sys.exit("Server status file already exists. Is another wrapper running?")
+	with open(__status__, 'w') as f:
+		f.write(__STATUSSTRINGS__[1])
+	os.mkfifo(__pipe__, 0o640)
+
+def __server_start__():
+	print("Server start.")
+	with open(__status__, 'w') as f:
+		f.write(__STATUSSTRINGS__[2])
+	pass
+
+def __server_stop__():
+	print("Server stop.")
+	with open(__status__, 'w') as f:
+		f.write(__STATUSSTRINGS__[3])
+	pass
+
+def __server_clean__():
+	print("Wrapper clean.")
+	try:
+		os.remove(__players__)
+	except Exception:
+		pass
+	try:
+		os.remove(__status__)
+	except Exception:
+		pass
+	try:
+		os.remove(__pipe__)
+	except Exception:
+		pass
+
+def __parse_line__(line):
+	if ': Done' in line:
+		__server_start__()
+	elif ': Stopping the server' in line:
+		__server_stop__()
+	elif 'logged in with entity id' in line:
+		name = line[len('[00:00:00] [Server thread/INFO]: '):]
+		name = name[:name.index('[')]
+		__user_join__(name)
+	elif 'left the game' in line:
+		name = line[len('[00:00:00] [Server thread/INFO]: '):]
+		name = name[:name.index(' ')]
+		__user_leave__(name)
+
+#################################################################################
+
+class __InputThread__(Thread):
+	def __init__(self, pipein, pipeprocess):
+		Thread.__init__(self, name='InputThread')
+		self.pipein = pipein
+		self.pipeprocess = pipeprocess
+		self.stopread = False
+	def stopexec(self):
+		self.stopread = True
+	def wake(self):
+		with open(__pipe__, 'w') as f:
+			f.write("\n")
+			f.flush()
+	def run(self):
+		with open(self.pipein, 'r') as p:
+			while not self.stopread:
+				ln = p.readline()
+				if ln:
+					print("Input: " + ln, end="")
+					self.pipeprocess.write(bytes(ln, sys.getdefaultencoding()))
+					self.pipeprocess.flush()
+				else:
+					time.sleep(1)
+			try:
+				os.remove(__pipe__)
+			except Exception:
+				pass
+
+def __server_send_stop__():
+	global prc
+	prc.stdin.write(bytes("/stop\n", sys.getdefaultencoding()))
+	prc.stdin.flush()
+
+def mcexec(identifier, cmd):
+	"""Executes cmd and parses output for server status changes.
+
+	  cmd     - List of program and arguments to be executed.
+	  logfile - Path in string. To entered file will be printed out full process output.
+	  """
+	global prc
+	__server_init__(identifier)
+	try:
+		os.makedirs(__log_prefix__ + identifier)
+	except Exception:
+		pass
+	prc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+			stderr=subprocess.STDOUT)
+	inputThread = __InputThread__(__pipe__, prc.stdin)
+	inputThread.start()
+	inputThread.wake() # Input thread is stack in waiting for first line
+	for linen in prc.stdout:
+		line = linen.decode(sys.getdefaultencoding())
+		with open(__log__, 'a') as flg:
+			flg.write(line)
+		__parse_line__(line.rstrip())
+	inputThread.stopexec()
+	__server_clean__()
+
+#################################################################################
+
+def __get_status__(identifier):
+	if not os.path.isfile(__status__):
+		return 0
+	else:
+		with open(__status__) as f:
+			status = f.readline().rstrip()
+			for key, val in __STATUSSTRINGS__.items():
+				if val == status:
+					return key
+
+def server_stop(identifier):
+	__setfiles__(identifier)
+	status = __get_status__(identifier)
+	if status == 0:
+		sys.exit("Such server is not running")
+	elif status == 1:
+		print("Server is starting. Waiting...")
+		while __get_status__(identifier) != 2:
+			time.sleep(1)
+	elif status == 3:
+		sys.exit("Server already stops")
+	with open(__pipe__, 'w') as f:
+		f.write("/stop\n")
+		f.flush()
+	while os.path.isfile(__status__):
+		pass
+
+def server_say(identifier, message):
+	__setfiles__(identifier)
+	if __get_status__(identifier) != 2:
+		sys.exit("Server is not running")
+	with open(__pipe__, 'w') as f:
+		f.write("/say " + ' '.join(map(str, message)))
+		f.flush()
+
+#################################################################################
+
+def __signal_term__(_signo, _stack_frame):
+	__server_send_stop__()
+
+if __name__ == '__main__':
+	todo = sys.argv[1]
+	identifier = sys.argv[2]
+	if todo == 'start':
+		signal.signal(signal.SIGTERM, __signal_term__)
+		cmd = sys.argv[3:]
+		mcexec(identifier, cmd)
+		__server_clean__()
+	elif todo == 'stop':
+		server_stop(identifier)
+	elif todo == 'say':
+		message = sys.argv[3:]
+		server_say(identifier, message)
+	else:
+		print("unknown action: " + todo)
