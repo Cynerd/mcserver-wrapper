@@ -3,111 +3,176 @@ import os
 import sys
 import re
 import subprocess
-import datetime
 import signal
 import time
+import datetime
+import traceback
 from threading import Thread
+import importlib.machinery as imp
+#################################################################################
+# Search for data folder
 
-__log_prefix__ = '/home/minecraft/log/'
-__folderprefix__ = '/dev/shm/'
-__folder__ = __folderprefix__
-__players__ = 'players'
-__status__ = 'status'
-__pipe__ = 'input_pipe'
-__log__ = 'none.log'
+__all_data_folders__ = (
+		os.path.dirname(__file__),
+		'.',
+		'~/mcwrapper',
+		'/usr/share/mcwrapper',
+		)
 
-__STATUSSTRINGS__ = { 0: "Not running",
-		1: "Starting",
-		2: "Running",
-		3: "Stopping"
-		}
+def __is_data_folder__(path):
+	if os.path.isdir(path + '/modules') and \
+	os.path.isfile(path + '/modules/utils.py'):
+	   return True
+	else:
+		return False
 
-def __setfiles__(identifier):
-	global __folder__
-	global __players__
-	global __status__
-	global __pipe__
-	global __log__
-	__folder__ = __folderprefix__ + 'mcwrapper_' + identifier + '/'
-	__players__ = __folder__ + 'players'
-	__status__ = __folder__ + 'status'
-	__pipe__ = __folder__ + 'input_pipe'
-	__log__ = __log_prefix__ + identifier + '/' + \
-		datetime.datetime.now().strftime('%y-%m-%d-%H-%M-%S')
+def __data_folder_missing__(path):
+	if not os.path.isdir(path + '/modules'):
+		print('Folder ' + path + 'modules not found.')
+		if not os.path.isfile(path + '/modules/utils.py'):
+			print('File ' + path + '/modules/utils.py not found.')
 
-def __user_join__(username):
-	print("User '" + username + "' joined server.")
-	with open(__players__, 'a') as f:
-		f.write(username + '\n')
+__data_folder__ = None
+try:
+	__data_folder__ = os.environ['DATAF']
+	if not __is_data_folder__(__data_folder__):
+		print("Error: " + __data_folder__ + " doesn't seems to be mcwrapper data folder.", file=sys.stderr)
+		sys.exit(2)
+except KeyError:
+	for df in __all_data_folders__:
+		if os.path.isdir(df):
+			__data_folder__ = df
+			break
+	if __data_folder__ == None:
+		print("Error: No mcwrapper data folder found.", file=sys.stderr)
+		sys.exit(1)
 
-def __user_leave__(username):
-	print("User '" + username + "' left server.")
-	players = set()
-	with open(__players__) as f:
-		for line in f:
-			pl = line.rstrip()
-			if pl != username:
-				players.add(line.rstrip())
-	with open(__players__, 'w') as f:
-		f.writelines(players)
-		if players:
-			f.write('\n')
+#################################################################################
+# Load and set utils
 
+utils = imp.SourceFileLoader("utils",
+		__data_folder__ + '/modules/utils.py').load_module()
+
+#################################################################################
+# Load configuration
+
+__all_config_files__ = (
+		'mcwrapper.conf',
+		'~/.mcwrapper.conf',
+		'~/.config/mcwrapper.conf',
+		'/etc/mcwrapper.conf',
+		)
+
+def __set_empty_config__():
+	global conf
+	print('Warning: User configuration not loaded. Using default.', file=sys.stderr)
+	conf = type('defconf', (object,), {})
+
+__config_file__ = None
+try:
+	__config_file__ = os.environ['CONFIG']
+except KeyError:
+	for cf in __all_config_files__:
+		if os.path.isfile(cf):
+			__config_file__ = cf
+			break
+if __config_file__ == None:
+	__set_empty_config__()
+else:
+	try:
+		conf = imp.SourceFileLoader("conf", __config_file__).load_module()
+	except Exception:
+		traceback.print_exc()
+		__set_empty_config__()
+
+# Set conf to utils
+utils.conf = conf
+
+utils.configSet(utils.__default_config__)
+# Set additional runtime configuration variables
+conf.verbose_level = 0
+conf.action = None
+conf.action_module = None
+conf.command = []
+conf.__modules_action__  = set()
+conf.__modules_argument__ = set()
+conf.modulesFolder = __data_folder__ + '/modules'
+
+#################################################################################
+# Modules management
+
+def __module_load__(modname):
+	try:
+		module = imp.SourceFileLoader(modname,
+				conf.modulesFolder + '/' + modname + '.py').load_module()
+		return module
+	except FileNotFoundError:
+		if conf.verbose_level >= -2:
+			print("Error: Unknown module " + mod, file=sys.stderr)
+		sys.exit(3)
+
+def __module_unload__(mod):
+	for name, value in vars(conf):
+		if re.search('^__modules', name):
+			try:
+				value.remote(mod)
+			except KeyError:
+				pass
+	del mod
+
+# Load global modules
+for mod in conf.modules:
+	module = __module_load__(mod)
+	if utils.Service.action in module.services:
+		conf.__modules_action__.add(module)
+	if utils.Service.argument in module.services:
+		conf.__modules_argument__.add(module)
+
+def server_modules_load():
+	conf.__modules_config__  = set()
+	conf.__modules_init__    = set()
+	conf.__modules_clean__   = set()
+	conf.__modules_parse__   = set()
+	for mod in conf.modules:
+		if conf.verbose_level >= 1:
+			print('Loading module: ' + mod)
+		module = __module_load__(mod)
+		if utils.Service.config in module.services:
+			conf.__modules_config__.add(module)
+		if utils.Service.init in module.services:
+			conf.__modules_init__.add(module)
+		if utils.Service.clean in module.services:
+			conf.__modules_clean__.add(module)
+		if utils.Service.parse in module.services:
+			conf.__modules_parse__.add(module)
+
+#################################################################################
 
 def __server_init__(identifier):
-	__setfiles__(identifier)
-	__server_clean__() # Clean before execute
-	print("Wrapper initializing with identifier: " + identifier)
+	if conf.verbose_level >= 0:
+		print("Wrapper initializing with identifier: " + identifier)
 	try:
-		os.mkdir(__folder__)
-	except Exception:
+		os.mkdir(conf.folder)
+	except FileExistsError:
 		pass
-	if os.path.isfile(__status__):
-		sys.exit("Server status file already exists. Is another wrapper running?")
-	with open(__status__, 'w') as f:
-		f.write(__STATUSSTRINGS__[1])
-	os.mkfifo(__pipe__, 0o640)
-
-def __server_start__():
-	print("Server start.")
-	with open(__status__, 'w') as f:
-		f.write(__STATUSSTRINGS__[2])
-	pass
-
-def __server_stop__():
-	print("Server stop.")
-	with open(__status__, 'w') as f:
-		f.write(__STATUSSTRINGS__[3])
-	pass
+	if os.path.isfile(conf.inputPipe):
+		if conf.verbose_level >= 2:
+			print("Error: Server input pipe already exists. Is another wrapper running?")
+		sys.exit(4)
+	os.mkfifo(conf.inputPipe, 0o640)
+	utils.serviceCall('init', 'init')
 
 def __server_clean__():
-	print("Wrapper clean.")
+	if conf.verbose_level >= 0:
+		print("Wrapper clean.")
+	utils.serviceCall('clean', 'clean')
 	try:
-		os.remove(__players__)
-	except Exception:
-		pass
-	try:
-		os.remove(__status__)
-	except Exception:
-		pass
-	try:
-		os.remove(__pipe__)
-	except Exception:
+		os.remove(conf.inputPipe)
+	except FileNotFoundError:
 		pass
 
 def __parse_line__(line):
-	if ': Done' in line:
-		__server_start__()
-	elif ': Stopping the server' in line:
-		__server_stop__()
-	elif 'logged in with entity id' in line:
-		name = line[len('[00:00:00] [Server thread/INFO]: '):]
-		name = name[:name.index('[')]
-		__user_join__(name)
-	elif 'left the game' in line:
-		name = line[len('[00:00:00] [Server thread/INFO]: '):]
-		name = name[:name.index(' ')]
-		__user_leave__(name)
+	utils.serviceCall('parse', 'parse', [line], 2)
 
 #################################################################################
 
@@ -120,22 +185,23 @@ class __InputThread__(Thread):
 	def stopexec(self):
 		self.stopread = True
 	def wake(self):
-		with open(__pipe__, 'w') as f:
+		with open(self.pipein, 'w') as f:
 			f.write("\n")
 			f.flush()
 	def run(self):
 		with open(self.pipein, 'r') as p:
 			while not self.stopread:
 				ln = p.readline()
-				if ln:
-					print("Input: " + ln, end="")
+				if ln.rstrip():
+					if conf.verbose_level >= 1:
+						print("Input: " + ln, end="")
 					self.pipeprocess.write(bytes(ln, sys.getdefaultencoding()))
 					self.pipeprocess.flush()
 				else:
 					time.sleep(1)
 			try:
-				os.remove(__pipe__)
-			except Exception:
+				os.remove(conf.inputPipe)
+			except FileNotFoundError:
 				pass
 
 def __server_send_stop__():
@@ -145,83 +211,199 @@ def __server_send_stop__():
 
 def mcexec(identifier, cmd):
 	"""Executes cmd and parses output for server status changes.
-
-	  cmd     - List of program and arguments to be executed.
-	  logfile - Path in string. To entered file will be printed out full process output.
-	  """
+    """
 	global prc
-	__server_init__(identifier)
-	try:
-		os.makedirs(__log_prefix__ + identifier)
-	except Exception:
-		pass
+	__server_init__(conf.identifier)
+	if conf.logOutput:
+		try:
+			os.makedirs(os.path.dirname(conf.logFile))
+		except FileExistsError:
+			pass
+	if type(cmd) != str:
+		cmd = ' '.join(cmd)
+	if conf.verbose_level >= 1:
+		print("Start command: " + cmd)
 	prc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-			stderr=subprocess.STDOUT)
-	inputThread = __InputThread__(__pipe__, prc.stdin)
+			stderr=subprocess.STDOUT, shell=True)
+	inputThread = __InputThread__(conf.inputPipe, prc.stdin)
 	inputThread.start()
-	inputThread.wake() # Input thread is stack in waiting for first line
+	inputThread.wake() # Input thread is stuck in waiting for first line
 	for linen in prc.stdout:
 		line = linen.decode(sys.getdefaultencoding())
-		with open(__log__, 'a') as flg:
-			flg.write(line)
+		if conf.verbose_level >= 2:
+			print(line.rstrip())
+		if conf.logOutput:
+			with open(conf.logFile, 'a') as flg:
+				flg.write(line)
 		__parse_line__(line.rstrip())
 	inputThread.stopexec()
 	__server_clean__()
 
 #################################################################################
 
-def __get_status__(identifier):
-	if not os.path.isfile(__status__):
-		return 0
-	else:
-		with open(__status__) as f:
-			status = f.readline().rstrip()
-			for key, val in __STATUSSTRINGS__.items():
-				if val == status:
-					return key
-
-def server_stop(identifier):
-	__setfiles__(identifier)
-	status = __get_status__(identifier)
-	if status == 0:
-		sys.exit("Such server is not running")
-	elif status == 1:
-		print("Server is starting. Waiting...")
-		while __get_status__(identifier) != 2:
-			time.sleep(1)
-	elif status == 3:
-		sys.exit("Server already stops")
-	with open(__pipe__, 'w') as f:
-		f.write("/stop\n")
-		f.flush()
-	while os.path.isfile(__status__):
-		pass
-
-def server_say(identifier, message):
-	__setfiles__(identifier)
-	if __get_status__(identifier) != 2:
-		sys.exit("Server is not running")
-	with open(__pipe__, 'w') as f:
-		f.write("/say " + ' '.join(map(str, message)))
-		f.flush()
-
-#################################################################################
-
 def __signal_term__(_signo, _stack_frame):
 	__server_send_stop__()
 
-if __name__ == '__main__':
-	todo = sys.argv[1]
-	identifier = sys.argv[2]
-	if todo == 'start':
-		signal.signal(signal.SIGTERM, __signal_term__)
-		cmd = sys.argv[3:]
-		mcexec(identifier, cmd)
-		__server_clean__()
-	elif todo == 'stop':
-		server_stop(identifier)
-	elif todo == 'say':
-		message = sys.argv[3:]
-		server_say(identifier, message)
+def action_start_exec():
+	if not conf.identifier:
+		argument_help_exec()
+		return
+	server_modules_load()
+	utils.serviceCall('config', 'config', [conf])
+	if not conf.command:
+		argument_help_exec()
+		return
+	signal.signal(signal.SIGTERM, __signal_term__)
+	signal.signal(signal.SIGINT, __signal_term__)
+	mcexec(conf.identifier, conf.command)
+
+
+def action_stop_exec():
+	if not conf.identifier:
+		argument_help_exec()
+		return
+	if not os.path.exists(conf.inputPipe):
+		sys.exit("Such server is not running")
+	with open(conf.inputPipe, 'w') as f:
+		f.write("/stop\n")
+		f.flush()
+	while os.path.exists(conf.inputPipe):
+		pass
+
+def argument_help_exec():
+	if conf.action_module == None:
+		if conf.action == 'start':
+			print('mcwrapper [arguments...] start IDENTIFIER {command...}')
+			print('  Start server under "IDENTIFIER" with command "command"')
+			print('')
+			print(' arguments')
+			utils.printArgumentsHelp()
+			print(' IDENTIFIER')
+			print('   Identifier for new server instance. This allows multiple server')
+			print('   instances running with this wrapper.')
+			print('   Identifier is word without spaces and preferably without special')
+			print('   characters.')
+			print(' command')
+			print('   Command to execute Minecraft server.')
+		elif conf.action == 'stop':
+			print('mcwrapper [arguments...] stop IDENTIFIER')
+			# TODO
+		else:
+			print('mcwrapper [arguments...] ACTION ...')
+			print('  This script is executing Minecraft server and reads its output.')
+			print('')
+			print(' arguments')
+			utils.printArgumentsHelp()
+			print('')
+			print(' ACTION')
+			print('   start')
+			print('       Starts server.')
+			print('   stop')
+			print('       Sends stop command to Minecraft server.')
+			for mod in conf.__modules_action__:
+				mod.action_help()
+			print('')
+			print('For more informations abou specific actions enter --help')
+			print('with ACTION argument.')
 	else:
-		print("unknown action: " + todo)
+		conf.action_module.action_full_help()
+
+#################################################################################
+
+if __name__ == '__main__':
+	print_help = False
+	arguments = set()
+	i = 1
+	while i < len(sys.argv):
+		arg = sys.argv[i]
+		if arg[0] == '-':
+			if len(arg) > 2 and arg[1] == '-':
+				cnt, mod = utils.serviceCall('argument', 'argument', [sys.argv[i:]], 2)
+				if cnt:
+					arguments.add(mod)
+					i += cnt
+					continue
+				if arg == '--help':
+					print_help = True
+					i += 1
+					continue
+				if arg == '--verbose':
+					conf.verbose_level += 1
+					i += 1
+					continue
+				if arg == '--quiet':
+					conf.verbose_level += 1
+					i += 1
+					continue
+			else:
+				docontinue = False
+				i += 1
+				for l in arg[1:]:
+					cnt, mod = utils.serviceCall('argument', 'argument_short',
+							[l, sys.argv[i:]], 2)
+					if cnt:
+						arguments.add(mod)
+						i += cnt
+						docontinue = True
+					elif l == 'h':
+						print_help = True
+						docontinue = True
+					elif l == 'v':
+						conf.verbose_level += 1
+						docontinue = True
+					elif l == 'q':
+						conf.verbose_level -= 1
+						docontinue = True
+				if docontinue:
+					continue
+		if conf.action == None:
+			rtn, mod = utils.serviceCall('action', 'action', [sys.argv[i:]], 2)
+			if rtn:
+				i += rtn
+				continue
+			if arg.lower() == 'start':
+				conf.action = 'start'
+				for arg in sys.argv[i+1:]:
+					if conf.identifier == None:
+						conf.identifier = arg
+					else:
+						if type(conf.command) == str:
+							conf.command += arg
+						else:
+							conf.command.append(arg)
+				break
+			if arg.lower() == 'stop':
+				conf.action = 'stop'
+				i += 1
+				continue
+		else:
+			if conf.action_module == None:
+				if conf.action == 'stop':
+					if not conf.identifier:
+						conf.identifier = args[0]
+						i += 1
+						continue
+			else:
+				cnt = conf.action_module.action(sys.argv[i:])
+				if cnt:
+					i += cnt
+					continue
+		sys.exit("Unknown argument: " + arg)
+
+
+	if conf.identifier:
+		utils.setServerConf(conf.identifier)
+	for mod in arguments:
+		mod.argument_exec()
+	if print_help:
+		argument_help_exec()
+		sys.exit()
+	if conf.action_module != None:
+		conf.action_module.action_exec()
+	else:
+		if conf.action == 'start':
+			action_start_exec()
+		elif conf.action == 'stop':
+			action_stop_exec()
+		else:
+			pass # This shouldn't happen
