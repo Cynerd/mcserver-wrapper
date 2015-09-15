@@ -1,0 +1,73 @@
+#!/usr/bin/env python3
+import os
+import sys
+import socket
+from threading import Thread
+import importlib.machinery as imp
+
+class conf:
+	modulesFolder = 'modules'
+	localip = '127.0.0.1'
+	localport = 25565
+	remoteip = '192.168.1.145'
+	remoteport = 25566
+
+# Load modules utils
+utils = imp.SourceFileLoader("utils",
+		conf.modulesFolder + '/utils.py').load_module()
+
+__players__ = set()
+
+class Packet:
+	def __init__(self, sizeoffset, bsize, data):
+		#print(sizeoffset)
+		#print(bsize)
+		pass
+
+class Player:
+	class Connection(Thread):
+		def __init__(self, source, target, player, direction):
+			Thread.__init__(self, name="PlayerConnection" + str(direction))
+			self.source = source
+			self.target = target
+			self.player = player
+		def run(self):
+			while True:
+				i = 0
+				packet_size = 0
+				nextbt = True
+				data = self.source.recv(1)
+				if not data: break
+				while nextbt:
+					bt = data[i]
+					nextbt = bool(bt & (1 << 7))
+					bt = bt & ~(1 << 7)
+					packet_size = packet_size | (bt << (i * 7))
+					if nextbt:
+						data += self.source.recv(1)
+						i += 1
+				data += self.source.recv(packet_size)
+				Packet(i, packet_size, data)
+				self.target.send(data)
+	def __init__(self, conn, addr):
+		self.conn = conn
+		self.addr = addr
+		self.s = socket.socket()
+		self.s.connect((conf.remoteip, conf.remoteport))
+		self.t_left = Player.Connection(conn, self.s, self, 1)
+		self.t_right = Player.Connection(self.s, conn, self, 2)
+		self.t_left.start()
+		self.t_right.start()
+
+def fakeserver():
+	s = socket.socket()
+	s.bind((conf.localip, conf.localport))
+	s.listen(2)
+	#while True:
+	conn, addr = s.accept()
+	__players__.add(Player(conn, addr))
+
+#################################################################################
+
+if __name__ == '__main__':
+	fakeserver()
