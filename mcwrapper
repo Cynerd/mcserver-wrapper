@@ -181,9 +181,9 @@ def mcexec():
     if type(conf.command) != str:
         conf.command = ' '.join(conf.command)
     if conf.verbose_level >= 1:
-        print("Folder: " + conf.folder)
+        print("Folder: " + conf.directory)
         print("Start command: " + conf.command)
-    os.chdir(conf.folder)
+    os.chdir(conf.directory)
     prc = subprocess.Popen(conf.command, stdin=subprocess.PIPE,
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
     inputThread = __InputThread__(prc.stdin)
@@ -204,7 +204,8 @@ def __signal_term__(_signo, _stack_frame):
 
 def print_help():
     print('mcwrapper [arguments...] ACTION ...')
-    print('  This script is executing Minecraft server and reads its output.')
+    print('  This script is executing Minecraft server and reads its output. From output is')
+    print('  extracted server status and list of online players.')
     print('')
     print(' arguments')
     print('   -h, --help')
@@ -288,9 +289,9 @@ if __name__ == '__main__':
                 sys.exit('Error: No configuration associated with identifier: ' + conf.identifier)
         # Set configurations for server
         try:
-            conf.folder
+            conf.directory
         except AttributeError:
-            sys.exit('Missing "folder" config')
+            sys.exit('Missing "directory" config')
         try:
             conf.command
         except AttributeError:
