@@ -66,6 +66,26 @@ __STATUSSTRINGS__ = {
     3: "Stopping",
     }
 
+def __user_join__(username):
+    global playerCount
+    playerCount += 1
+    if conf.verbose_level >= 0:
+        print("User '" + username + "' joined server.")
+    with open(conf.playersFile, 'a') as f:
+        players.add(username)
+        f.write(username + '\n')
+
+def __user_leave__(username):
+    global playerCount
+    playerCount -= 1
+    if conf.verbose_level >= 0:
+        print("User '" + username + "' left server.")
+    players.remove(username)
+    with open(conf.playersFile, 'w') as f:
+        f.writelines(players)
+        if players:
+            f.write('\n')
+
 def __server_start__():
     if conf.verbose_level >= 0:
         print("Wrapper initializing with identifier: " + conf.identifier)
@@ -82,6 +102,12 @@ def __server_start__():
     statusFile = conf.status + '/status'
     with open(statusFile, 'w') as f:
         f.write(__STATUSSTRINGS__[1])
+    global playersFile
+    playersFile = conf.status + '/status'
+    with open(playersFile, 'w') as f:
+        pass
+    global playerCount
+    playerCount = 0
 
 def __server_clean__():
     if conf.verbose_level >= 0:
@@ -94,6 +120,10 @@ def __server_clean__():
         os.remove(statusFile)
     except FileNotFoundError:
         pass
+    try:
+        os.remove(playersFile)
+    except FileNotFoundError:
+        pass
 
 def __parse_line__(line):
     if ': Done' in line:
@@ -104,6 +134,14 @@ def __parse_line__(line):
         print("Server stop.")
         with open(statusFile, 'w') as f:
             f.write(__STATUSSTRINGS__[3] + '\n')
+    elif 'logged in with entity id' in line:
+        name = line[len('[00:00:00] [Server thread/INFO]: '):]
+        name = name[:name.index('[')]
+        __user_join__(name)
+    elif 'left the game' in line:
+        name = line[len('[00:00:00] [Server thread/INFO]: '):]
+        name = name[:name.index(' ')]
+        __user_leave__(name)
 
 #################################################################################
 
@@ -188,15 +226,20 @@ def print_help():
     print('     Start server under "IDENTIFIER"')
     print('   stop IDENTIFIER')
     print('       Sends stop command to server under "IDENTIFIER"')
+    print('   say IDENTIFIER {message...}')
+    print('       Sends message to server chat')
     sys.exit()
 
 if __name__ == '__main__':
     action = None
-    identifier = None
+    message = []
     for arg in sys.argv[1:]:
-        if (action == 'start' or action == 'stop') \
-          and identifier == None:
-            identifier = arg
+        if (action == 'start' or action == 'stop' or action == 'say') \
+          and conf.identifier == None:
+            conf.identifier = arg
+            continue
+        if action == 'say':
+            message.append(arg)
             continue
         if arg[0] == '-':
             if len(arg) > 2 and arg[1] == '-':
@@ -225,14 +268,14 @@ if __name__ == '__main__':
             if arg.lower() == 'stop':
                 action = 'stop'
                 continue
+            if arg.lower() == 'say':
+                action = 'say'
+                continue
         sys.exit("Unknown argument: " + arg)
     # Parsing args ends
 
-    # Replace identifier if provided
-    if identifier:
-        conf.identifier = identifier
     # Expand configuration for specified identifier
-    if action == 'start' or action == 'stop':
+    if action == 'start' or action == 'stop' or action == 'say':
         if not conf.identifier:
             print('Missing server identifier argument!')
             print('')
@@ -272,5 +315,14 @@ if __name__ == '__main__':
             f.flush()
         while os.path.exists(inputPipe): # Block until server stops
             pass
+    elif action == 'say':
+        if not os.path.exists(inputPipe):
+            sys.exit("Such server is not running")
+        with open(inputPipe, 'w') as f:
+            msg = ' '.join(message)
+            msg = re.sub('^','say ', msg)
+            print(msg)
+            f.write(msg + '\n')
+            f.flush()
     else:
         print_help()
