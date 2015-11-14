@@ -203,7 +203,7 @@ def __signal_term__(_signo, _stack_frame):
     __server_send_stop__()
 
 def print_help():
-    print('mcwrapper [arguments...] ACTION ...')
+    print('mcwrapper [arguments...] IDENTIFIER')
     print('  This script is executing Minecraft server and reads its output. From output is')
     print('  extracted server status and list of online players.')
     print('')
@@ -214,34 +214,15 @@ def print_help():
     print('       Increase verbose level of output.')
     print('   -q, --quiet')
     print('       Decrease verbose level of output.')
-    print('')
-    print(' Common action arguments')
-    print('   IDENTIFIER')
-    print('     Identifier for new server instance. This allows multiple server')
-    print('     instances running with this wrapper.')
-    print('     Identifier is word without spaces and preferably without special')
-    print('     characters.')
-    print('')
-    print(' ACTION and it\'s arguments')
-    print('   start INDETIFIER')
-    print('     Start server under "IDENTIFIER"')
-    print('   stop IDENTIFIER')
-    print('       Sends stop command to server under "IDENTIFIER"')
-    print('   say IDENTIFIER {message...}')
-    print('       Sends message to server chat')
+    print(' IDENTIFIER')
+    print('   Identifier for new server. This allows multiple servers running with this')
+    print('   wrapper.  Identifier is word without spaces and preferably without special')
+    print('   characters.')
     sys.exit()
 
 if __name__ == '__main__':
-    action = None
     message = []
     for arg in sys.argv[1:]:
-        if (action == 'start' or action == 'stop' or action == 'say') \
-          and conf.identifier == None:
-            conf.identifier = arg
-            continue
-        if action == 'say':
-            message.append(arg)
-            continue
         if arg[0] == '-':
             if len(arg) > 2 and arg[1] == '-':
                 if arg == '--help':
@@ -262,68 +243,42 @@ if __name__ == '__main__':
                     else:
                         sys.exit("Unknown short argument " + l)
                 continue
-        if action == None:
-            if arg.lower() == 'start':
-                action = 'start'
-                continue
-            if arg.lower() == 'stop':
-                action = 'stop'
-                continue
-            if arg.lower() == 'say':
-                action = 'say'
-                continue
+        if conf.identifier == None:
+            conf.identifier = arg
+            continue
         sys.exit("Unknown argument: " + arg)
     # Parsing args ends
 
     # Expand configuration for specified identifier
-    if action == 'start' or action == 'stop' or action == 'say':
-        if not conf.identifier:
-            print('Missing server identifier argument!')
-            print('')
-            print_help()
-        try:
-            conf.server[conf.identifier]
-            vars(conf).update(conf.server[conf.identifier])
-        except KeyError:
-            if conf.verbose_level >= -1:
-                sys.exit('Error: No configuration associated with identifier: ' + conf.identifier)
-        # Set configurations for server
-        try:
-            conf.directory
-        except AttributeError:
-            sys.exit('Missing "directory" config')
-        try:
-            conf.command
-        except AttributeError:
-            sys.exit('Missing server start command!')
-        try:
-            conf.status
-        except AttributeError:
-            conf.status = '/dev/shm/mcwrapper-' + conf.identifier
-        # Set inputPipe
-        global inputPipe
-        inputPipe = conf.status + '/input_pipe'
-
-    if action == 'start':
-        signal.signal(signal.SIGTERM, __signal_term__)
-        signal.signal(signal.SIGINT, __signal_term__)
-        mcexec()
-    elif action == 'stop':
-        if not os.path.exists(inputPipe):
-            sys.exit("Such server is not running")
-        with open(inputPipe, 'w') as f:
-            f.write("/stop\n")
-            f.flush()
-        while os.path.exists(inputPipe): # Block until server stops
-            pass
-    elif action == 'say':
-        if not os.path.exists(inputPipe):
-            sys.exit("Such server is not running")
-        with open(inputPipe, 'w') as f:
-            msg = ' '.join(message)
-            msg = re.sub('^','say ', msg)
-            print(msg)
-            f.write(msg + '\n')
-            f.flush()
-    else:
+    if not conf.identifier:
+        print('Missing server identifier argument!')
+        print('')
         print_help()
+    try:
+        conf.server[conf.identifier]
+        vars(conf).update(conf.server[conf.identifier])
+    except KeyError:
+        if conf.verbose_level >= -1:
+            sys.exit('Error: No configuration associated with identifier: ' + conf.identifier)
+        else:
+            sys.exit();
+    # Set configurations for server
+    try:
+        conf.directory
+    except AttributeError:
+        sys.exit('Missing "directory" config for server ' + conf.identifier)
+    try:
+        conf.command
+    except AttributeError:
+        sys.exit('Missing server start command for server ' + conf.identifier)
+    try:
+        conf.status
+    except AttributeError:
+        conf.status = '/dev/shm/mcwrapper-' + conf.identifier
+    # Set inputPipe
+    global inputPipe
+    inputPipe = conf.status + '/input_pipe'
+
+    signal.signal(signal.SIGTERM, __signal_term__)
+    signal.signal(signal.SIGINT, __signal_term__)
+    mcexec()

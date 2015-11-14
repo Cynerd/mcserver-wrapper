@@ -1,7 +1,7 @@
 MINECRAFT-WRAPPER
 =================
-
-Python server wrapper for extracting informations about server status and list of online players.
+Python server wrapper for extracting informations about server status and list of
+online players.
 
 Requires:
 -----------------
@@ -12,7 +12,7 @@ Requires:
 Usage
 -----------------
 ```
-mcwrapper [arguments...] ACTION ...
+mcwrapper [arguments...] IDENTIFIER
   This script is executing Minecraft server and reads its output. From output is
   extracted server status and list of online players.
 
@@ -24,20 +24,10 @@ mcwrapper [arguments...] ACTION ...
    -q, --quiet
 	   Decrease verbose level of output.
 
- Common action arguments
-   IDENTIFIER
-	 Identifier for new server instance. This allows multiple server
-	 instances running with this wrapper.
-	 Identifier is word without spaces and preferably without special
-	 characters.
-
- ACTION and it's arguments
-   start INDETIFIER
-	 Start server under "IDENTIFIER"
-   stop IDENTIFIER
-	   Sends stop command to server under "IDENTIFIER"
-   say IDENTIFIER {message...}
-	   Sends message to server chat
+ IDENTIFIER
+   Identifier for new server. This allows multiple servers running with this
+   wrapper.  Identifier is word without spaces and preferably without special
+   characters.
 ```
 
 How it works
