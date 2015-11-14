@@ -11,6 +11,7 @@ from threading import Thread
 import importlib.machinery as imp
 #################################################################################
 # Load configuration
+# This segment is same as in mcmim
 
 __all_config_files__ = (
         'mcwrapper.conf',
@@ -221,6 +222,7 @@ def print_help():
     sys.exit()
 
 if __name__ == '__main__':
+    identifier = None
     message = []
     for arg in sys.argv[1:]:
         if arg[0] == '-':
@@ -243,12 +245,15 @@ if __name__ == '__main__':
                     else:
                         sys.exit("Unknown short argument " + l)
                 continue
-        if conf.identifier == None:
-            conf.identifier = arg
+        if identifier == None:
+            identifier = arg
             continue
         sys.exit("Unknown argument: " + arg)
     # Parsing args ends
 
+    # Set identifier if provided
+    if identifier:
+        conf.identifier = identifier
     # Expand configuration for specified identifier
     if not conf.identifier:
         print('Missing server identifier argument!')
