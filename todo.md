@@ -1,2 +1,3 @@
- * Say command should accept text from stdin
+mcwrapper
+=========
  * Add automatic server shutdown after elapsed time without any player
