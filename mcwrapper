@@ -45,17 +45,9 @@ else: # else load configuration
         __set_empty_config__()
 
 # Set additional runtime configuration variables
-try:
-    conf.verbose_level
-except AttributeError:
+if not 'verbose_level' in vars(conf):
     conf.verbose_level = 0
-try:
-    conf.command
-except AttributeError:
-    conf.command = []
-try:
-    conf.server
-except AttributeError:
+if not 'server' in vars(conf):
     conf.server = dict()
 
 #################################################################################
@@ -263,22 +255,13 @@ if __name__ == '__main__':
         conf.server[conf.identifier]
         vars(conf).update(conf.server[conf.identifier])
     except KeyError:
-        if conf.verbose_level >= -1:
-            sys.exit('Error: No configuration associated with identifier: ' + conf.identifier)
-        else:
-            sys.exit();
-    # Set configurations for server
-    try:
-        conf.directory
-    except AttributeError:
+        sys.exit('Error: No configuration associated with identifier: ' + conf.identifier)
+    # Check configurations for server
+    if not 'directory' in vars(conf):
         sys.exit('Missing "directory" config for server ' + conf.identifier)
-    try:
-        conf.command
-    except AttributeError:
+    if not 'command' in vars(conf):
         sys.exit('Missing server start command for server ' + conf.identifier)
-    try:
-        conf.status
-    except AttributeError:
+    if not 'status' in vars(conf):
         conf.status = '/dev/shm/mcwrapper-' + conf.identifier
     # Set inputPipe
     global inputPipe
