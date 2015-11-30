@@ -7,6 +7,7 @@ import signal
 import time
 import datetime
 import traceback
+import atexit
 from threading import Thread
 import importlib.machinery as imp
 #################################################################################
@@ -170,7 +171,6 @@ def mcexec():
     """Executes cmd and parses output for server status changes.
     """
     global prc
-    __server_start__()
     if type(conf.command) != str:
         conf.command = ' '.join(conf.command)
     if conf.verbose_level >= 1:
@@ -188,7 +188,6 @@ def mcexec():
             print(line.rstrip())
         __parse_line__(line.rstrip())
     inputThread.stopexec()
-    __server_clean__()
 
 #################################################################################
 
@@ -269,4 +268,6 @@ if __name__ == '__main__':
 
     signal.signal(signal.SIGTERM, __signal_term__)
     signal.signal(signal.SIGINT, __signal_term__)
+    __server_start__()
+    atexit.register(__server_clean__)
     mcexec()
