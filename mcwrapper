@@ -176,7 +176,7 @@ def mcexec():
     if conf.verbose_level >= 1:
         print("Folder: " + conf.directory)
         print("Start command: " + conf.command)
-    os.chdir(conf.directory)
+    os.chdir(os.path.expanduser(conf.directory))
     prc = subprocess.Popen(conf.command, stdin=subprocess.PIPE,
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
     inputThread = __InputThread__(prc.stdin)
