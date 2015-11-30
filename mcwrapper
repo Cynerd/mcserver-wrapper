@@ -32,8 +32,8 @@ try:
 except KeyError:
         # Find configuration in predefined paths
     for cf in __all_config_files__:
-        if os.path.isfile(cf):
-            __config_file__ = cf
+        if os.path.isfile(os.path.expanduser(cf)):
+            __config_file__ = os.path.expanduser(cf)
             break
 if __config_file__ == None: # If no configuration find. Set empty config
     __set_empty_config__()
