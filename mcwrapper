@@ -62,20 +62,24 @@ __STATUSSTRINGS__ = {
 
 def __user_join__(username):
     global playerCount
+    global playersFile
+    global players
     playerCount += 1
     if conf.verbose_level >= 0:
         print("User '" + username + "' joined server.")
-    with open(conf.playersFile, 'a') as f:
+    with open(playersFile, 'a') as f:
         players.add(username)
         f.write(username + '\n')
 
 def __user_leave__(username):
     global playerCount
+    global playersFile
+    global players
     playerCount -= 1
     if conf.verbose_level >= 0:
         print("User '" + username + "' left server.")
     players.remove(username)
-    with open(conf.playersFile, 'w') as f:
+    with open(playersFile, 'w') as f:
         f.writelines(players)
         if players:
             f.write('\n')
@@ -102,6 +106,8 @@ def __server_start__():
         pass
     global playerCount
     playerCount = 0
+    global players
+    players = set()
 
 def __server_clean__():
     if conf.verbose_level >= 0:
