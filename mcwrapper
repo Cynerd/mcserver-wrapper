@@ -99,7 +99,7 @@ def __server_start__():
     global statusFile
     statusFile = conf.status + '/status'
     with open(statusFile, 'w') as f:
-        f.write(__STATUSSTRINGS__[1])
+        f.write(__STATUSSTRINGS__[1] + '\n')
     global playersFile
     playersFile = conf.status + '/players'
     with open(playersFile, 'w') as f:
