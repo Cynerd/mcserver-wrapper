@@ -56,7 +56,7 @@ def load_conf(config_file):
 def autoshutdown_enable():
     global shutdownTimeout
     if (conf.timeout > 0):
-        if (conf.verbose_level > 0):
+        if (conf.verbose_level >= 0):
             print("Automatic shutdown after " + str(conf.timeout) +
                 " min.")
         shutdownTimeout = Timer(conf.timeout * 60.0, __server_send_stop__)
@@ -68,7 +68,7 @@ def autoshutdown_disable():
     try:
         shutdownTimeout.cancel()
         del shutdownTimeout
-        if (conf.verbose_level > 0):
+        if (conf.verbose_level >= 0):
             print("Automatic shutdown disabled.")
     except NameError:
         pass
