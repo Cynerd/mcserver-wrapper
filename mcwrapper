@@ -24,35 +24,32 @@ __all_config_files__ = (
 
 def __set_empty_config__():
     global conf
-    global conf_source
     print('Warning: User configuration not loaded. Using default.', file=sys.stderr)
     conf = type('default config', (object,), {})
 
-__config_file__ = None
-try:
-    __config_file__ = os.environ['CONFIG'] # get config file from environment
-except KeyError:
+def load_conf(config_file):
+    global conf
+    if config_file == None:
         # Find configuration in predefined paths
-    for cf in __all_config_files__:
-        if os.path.isfile(os.path.expanduser(cf)):
-            __config_file__ = os.path.expanduser(cf)
-            break
-if __config_file__ == None: # If no configuration find. Set empty config
-    __set_empty_config__()
-else: # else load configuration
-    try:
-        conf = imp.SourceFileLoader("conf", __config_file__).load_module()
-    except Exception:
-        traceback.print_exc()
+        for cf in __all_config_files__:
+            if os.path.isfile(os.path.expanduser(cf)):
+                config_file = os.path.expanduser(cf)
+                break
+    if config_file == None: # If no configuration find. Set empty config
         __set_empty_config__()
-
-# Set additional runtime configuration variables
-if not 'verbose_level' in vars(conf):
-    conf.verbose_level = 0
-if not 'server' in vars(conf):
-    conf.server = dict()
-if not 'timeout' in vars(conf):
-    conf.timeout = 0
+    else: # else load configuration
+        try:
+            conf = imp.SourceFileLoader("conf", config_file).load_module()
+        except Exception:
+            traceback.print_exc()
+            __set_empty_config__()
+    # Set additional runtime configuration variables
+    if not 'verbose_level' in vars(conf):
+        conf.verbose_level = 0
+    if not 'server' in vars(conf):
+        conf.server = dict()
+    if not 'timeout' in vars(conf):
+        conf.timeout = 0
 
 #################################################################################
 
@@ -229,6 +226,8 @@ def print_help():
     print('       Increase verbose level of output.')
     print('   -q, --quiet')
     print('       Decrease verbose level of output.')
+    print('   --config CONFIG_FILE')
+    print('       Specify configuration file to be used.')
     print(' IDENTIFIER')
     print('   Identifier for new server. This allows multiple servers running with this')
     print('   wrapper.  Identifier is word without spaces and preferably without special')
@@ -237,25 +236,36 @@ def print_help():
 
 if __name__ == '__main__':
     identifier = None
+    use_config = None
+    verbose_level = 0
     message = []
-    for arg in sys.argv[1:]:
+    i = 1
+    while i < len(sys.argv):
+        arg = sys.argv[i]
+        i += 1
         if arg[0] == '-':
             if len(arg) > 2 and arg[1] == '-':
                 if arg == '--help':
                     print_help()
-                if arg == '--verbose':
-                    conf.verbose_level += 1
-                if arg == '--quiet':
-                    conf.verbose_level += 1
-                    continue
+                elif arg == '--verbose':
+                    verbose_level += 1
+                elif arg == '--quiet':
+                    verbose_level += 1
+                elif arg == '--config':
+                    if use_config != None:
+                        sys.exit('Config option is used multiple times')
+                    else:
+                        use_config = sys.argv[i]
+                        i += 1
+                continue
             else:
                 for l in arg[1:]:
                     if l == 'h':
                         print_help()
                     elif l == 'v':
-                        conf.verbose_level += 1
+                        verbose_level += 1
                     elif l == 'q':
-                        conf.verbose_level -= 1
+                        verbose_level -= 1
                     else:
                         sys.exit("Unknown short argument " + l)
                 continue
@@ -265,11 +275,13 @@ if __name__ == '__main__':
         sys.exit("Unknown argument: " + arg)
     # Parsing args ends
 
+    load_conf(use_config)
+    conf.verbose_level += verbose_level
     # Set identifier if provided
     if identifier:
         conf.identifier = identifier
     # Expand configuration for specified identifier
-    if not conf.identifier:
+    if 'identifier' not in vars(conf):
         print('Missing server identifier argument!')
         print('')
         print_help()
