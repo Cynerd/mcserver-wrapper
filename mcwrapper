@@ -86,10 +86,8 @@ __STATUSSTRINGS__ = {
     }
 
 def __user_join__(username):
-    global playerCount
     global playersFile
     global players
-    playerCount += 1
     if conf.verbose_level >= 0:
         print("User '" + username + "' joined server.")
     with open(playersFile, 'a') as f:
@@ -98,10 +96,8 @@ def __user_join__(username):
     autoshutdown_disable()
 
 def __user_leave__(username):
-    global playerCount
     global playersFile
     global players
-    playerCount -= 1
     if conf.verbose_level >= 0:
         print("User '" + username + "' left server.")
     players.remove(username)
@@ -124,18 +120,10 @@ def __server_start__():
             print("Error: Server input pipe already exists. Is another wrapper running?")
         sys.exit(4)
     os.mkfifo(inputPipe, 0o640)
-    global statusFile
-    statusFile = conf.status + '/status'
     with open(statusFile, 'w') as f:
         f.write(__STATUSSTRINGS__[1] + '\n')
-    global playersFile
-    playersFile = conf.status + '/players'
     with open(playersFile, 'w') as f:
         pass
-    global playerCount
-    playerCount = 0
-    global players
-    players = set()
 
 def __server_clean__():
     if conf.verbose_level >= 0:
@@ -300,6 +288,12 @@ if __name__ == '__main__':
     # Set inputPipe
     global inputPipe
     inputPipe = conf.status + '/input_pipe'
+    global statusFile
+    statusFile = conf.status + '/status'
+    global playersFile
+    playersFile = conf.status + '/players'
+    global players
+    players = set()
 
     signal.signal(signal.SIGTERM, __signal_term__)
     signal.signal(signal.SIGINT, __signal_term__)
