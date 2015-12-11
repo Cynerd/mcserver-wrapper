@@ -9,6 +9,7 @@ import datetime
 import traceback
 import atexit
 from threading import Thread
+from threading import Timer
 import importlib.machinery as imp
 #################################################################################
 # Load configuration
@@ -50,6 +51,30 @@ if not 'verbose_level' in vars(conf):
     conf.verbose_level = 0
 if not 'server' in vars(conf):
     conf.server = dict()
+if not 'timeout' in vars(conf):
+    conf.timeout = 0
+
+#################################################################################
+
+def autoshutdown_enable():
+    global shutdownTimeout
+    if (conf.timeout > 0):
+        if (conf.verbose_level > 0):
+            print("Automatic shutdown after " + str(conf.timeout) +
+                " min.")
+        shutdownTimeout = Timer(conf.timeout * 60.0, __server_send_stop__)
+        shutdownTimeout.start();
+    pass
+
+def autoshutdown_disable():
+    global shutdownTimeout
+    try:
+        shutdownTimeout.cancel()
+        del shutdownTimeout
+        if (conf.verbose_level > 0):
+            print("Automatic shutdown disabled.")
+    except NameError:
+        pass
 
 #################################################################################
 
@@ -70,6 +95,7 @@ def __user_join__(username):
     with open(playersFile, 'a') as f:
         players.add(username)
         f.write(username + '\n')
+    autoshutdown_disable()
 
 def __user_leave__(username):
     global playerCount
@@ -83,6 +109,8 @@ def __user_leave__(username):
         f.writelines(players)
         if players:
             f.write('\n')
+    if (not players):
+        autoshutdown_enable()
 
 def __server_start__():
     if conf.verbose_level >= 0:
@@ -130,6 +158,7 @@ def __parse_line__(line):
         print("Server start.")
         with open(statusFile, 'w') as f:
             f.write(__STATUSSTRINGS__[2] + '\n')
+        autoshutdown_enable()
     elif ': Stopping the server' in line:
         print("Server stop.")
         with open(statusFile, 'w') as f:
