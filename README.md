@@ -58,6 +58,11 @@ This is unix pipe. This file is located in status directory and named as
 write access rights (default 640), then you can send any command to Minecraft
 server by writing to this pipe.
 
+##Server.pid file
+This file contains PID of Minecraft server process. This is used to detect if
+server is running when status files exists. It has probably no usage from user,
+but shouldn't be tempered with.
+
 Configuration
 -----------------
 You can use `example.conf` as base configuration. Configuration file is in fact
