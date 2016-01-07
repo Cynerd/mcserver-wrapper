@@ -112,11 +112,22 @@ def __server_start__():
         os.mkdir(conf.status)
     except FileExistsError:
         pass
-    if os.path.isfile(inputPipe):
-        if conf.verbose_level >= -1:
-            print("Error: Server input pipe already exists. Is another wrapper running?")
-        sys.exit(4)
-    os.mkfifo(inputPipe, 0o640)
+    try:
+        os.mkfifo(inputPipe, 0o640)
+    except FileExistsError:
+        pass
+    if os.path.isfile(pidfile):
+        with open(pidfile) as f:
+            lpid = int(f.readline())
+        try:
+            os.kill(lpid, 0)
+        except OSError:
+            if conf.verbose_level >= 0:
+                print("Warning: Detected forced termination of previous wrapper instance")
+        else:
+            if conf.verbose_level >= -1:
+                print("Error: Another wrapper is running with given identifier.")
+            sys.exit(4)
     with open(statusFile, 'w') as f:
         f.write(__STATUSSTRINGS__[1] + '\n')
     with open(playersFile, 'w') as f:
@@ -137,6 +148,8 @@ def __server_clean__():
         os.remove(playersFile)
     except FileNotFoundError:
         pass
+    if os.path.isfile(pidfile):
+        os.remove(pidfile)
 
 def __parse_line__(line):
     if ': Done' in line:
@@ -198,7 +211,10 @@ def mcexec():
         print("Start command: " + conf.command)
     os.chdir(os.path.expanduser(conf.directory))
     prc = subprocess.Popen(conf.command, stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True,
+             start_new_session=False)
+    with open(pidfile, "w") as f:
+        f.write(str(prc.pid))
     inputThread = __InputThread__(prc.stdin)
     inputThread.start()
     inputThread.wake() # Input thread is stuck in waiting for first line
@@ -304,6 +320,8 @@ if __name__ == '__main__':
     statusFile = conf.status + '/status'
     global playersFile
     playersFile = conf.status + '/players'
+    global pidfile
+    pidfile = conf.status + '/server.pid'
     global players
     players = set()
 
