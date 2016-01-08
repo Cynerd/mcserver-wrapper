@@ -324,16 +324,26 @@ def print_help():
     print('       Decrease verbose level of output.')
     print('   --config CONFIG_FILE')
     print('       Specify configuration file to be used.')
+    print('   --configfile')
+    print('       prints used configuration file and exits.')
     print(' IDENTIFIER')
     print('   Identifier for new server. This allows multiple servers running with this')
     print('   wrapper.  Identifier is word without spaces and preferably without special')
     print('   characters.')
     sys.exit(_EC_OK)
 
+def print_conffile():
+    if '__file__' in vars(conf):
+        print(conf.__file__)
+    else:
+        print("No configuration file used.")
+    sys.exit(_EC_OK)
+
 if __name__ == '__main__':
     identifier = None
     use_config = None
     verbose_level = 0
+    print_config_file = False
     i = 1
     while i < len(sys.argv):
         arg = sys.argv[i]
@@ -353,6 +363,8 @@ if __name__ == '__main__':
                     else:
                         use_config = sys.argv[i]
                         i += 1
+                elif arg == '--configfile':
+                    print_config_file = True
                 continue
             else:
                 for l in arg[1:]:
@@ -372,10 +384,16 @@ if __name__ == '__main__':
     # Parsing args ends
 
     load_conf(use_config)
+
+    if print_config_file:
+        print_conffile()
+
     conf.verbose_level += verbose_level
     # Set identifier if provided
     if identifier:
         conf.identifier = identifier
+    elif not "identifier" in vars(conf):
+        print_help()
 
     signal.signal(signal.SIGTERM, __signal_term__)
     signal.signal(signal.SIGINT, __signal_term__)
