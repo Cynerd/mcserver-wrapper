@@ -199,10 +199,10 @@ class MCServer:
             return False
     def write_to_terminal(self, text):
         "Write to server terminal. If server not running it does nothing"
-        if self.statis == 2:
-            info(self.identifier + ": Input: " + ln,  1)
-            self.prc.write(bytes(line, sys.getdefaultencoding()))
-            self.prc.flush()
+        if self.status == 2:
+            info(self.identifier + ": Input: " + text,  1)
+            self.prc.stdin.write(bytes(text, sys.getdefaultencoding()))
+            self.prc.stdin.flush()
             return True
         else:
             return False
