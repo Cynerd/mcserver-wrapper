@@ -56,16 +56,16 @@ This file in in status directory named as `players`. If server is running, it
 contains online players. Player name per line.  If server isn't running, it
 content don't have to be valid.
 
-##Input pipe
+###Input pipe
 This is unix pipe. This file is located in status directory and named as
 `input_pipe`.  This pipe is input to Minercraft server standard input. If you have
 write access rights (default 640), then you can send any command to Minecraft
 server by writing to this pipe.
 
-##Server.pid file
+###Server.pid file
 This file contains PID of Minecraft server process. This is used to detect if
-server is running when status files exists. It has probably no usage from user,
-but shouldn't be tempered with.
+server is running when status files exists. It has probably no usage for user, but
+shouldn't be tempered with.
 
 Configuration
 -----------------
