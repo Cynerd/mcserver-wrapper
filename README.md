@@ -52,8 +52,8 @@ Status can be:
 If file not exists, then server is not running at all.
 
 ###Players file
-This file in in status directory named as `players`. If server is running, it
-contains online players. Player name per line.  If server isn't running, it
+This file in in status directory and is named as `players`. If server is running,
+it contains online players. Player name per line.  If server isn't running, it
 content don't have to be valid.
 
 ###Input pipe
