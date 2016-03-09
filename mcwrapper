@@ -2,17 +2,15 @@
 # vim: expandtab ft=python ts=4 sw=4 sts=4:
 import os
 import sys
-import re
 import subprocess
 import signal
 import time
-import datetime
 import traceback
 import atexit
 from threading import Thread
 from threading import Timer
 import importlib.machinery as imp
-#################################################################################
+###############################################################################
 # Exit codes and prints helpers
 _EC_OK = 0
 _EC_ARG_UNKNOWN = 1
@@ -20,13 +18,15 @@ _EC_ARG_MULTIPLE_CONFIG = 2
 _EC_MISSING_CONFIGURATION = 10
 _EC_SERVER_RUNNING = 11
 
+
 def __print_message__(message, file=sys.stdout, notime=False):
     if notime:
         print(message, file=file)
     else:
         print('[' + time.strftime('%H:%M:%S') + '] ' + message, file=file)
 
-def info(message, minverbose = 0, notime=False):
+
+def info(message, minverbose=0, notime=False):
     "Prints message to stdout if minverbose >= verbose_level"
     try:
         if conf.verbose_level >= minverbose:
@@ -34,7 +34,8 @@ def info(message, minverbose = 0, notime=False):
     except (NameError, TypeError):
         __print_message__(message, notime=notime)
 
-def warning(message, minverbose = -1, notime=False):
+
+def warning(message, minverbose=-1, notime=False):
     "Prints message to stderr if minverbose >= verbose_level"
     try:
         if conf.verbose_level >= minverbose:
@@ -42,7 +43,8 @@ def warning(message, minverbose = -1, notime=False):
     except (NameError, TypeError):
         __print_message__(message, file=sys.stderr, notime=notime)
 
-def error(message, minverbose = -2, ec = -1, notime=False):
+
+def error(message, minverbose=-2, ec=-1, notime=False):
     "Prints message to stderr if minverbose >= verbose_level"
     try:
         if conf.verbose_level >= minverbose:
@@ -51,80 +53,89 @@ def error(message, minverbose = -2, ec = -1, notime=False):
         __print_message__(message, file=sys.stderr, notime=notime)
     sys.exit(ec)
 
-#################################################################################
+###############################################################################
 # Load configuration
 
 __all_config_files__ = (
-        'mcwrapper.conf',
-        '~/.mcwrapper.conf',
-        '~/.config/mcwrapper.conf',
-        '/etc/mcwrapper.conf',
-        )
+    'mcwrapper.conf',
+    '~/.mcwrapper.conf',
+    '~/.config/mcwrapper.conf',
+    '/etc/mcwrapper.conf',
+    )
+
 
 def load_conf(config_file):
-    "Load config_file to conf variable. Or if it has value None, search on default paths"
+    """Load config_file to conf variable. Or if it has value None, search on
+    default paths"""
     global conf
+
     def __set_empty_config__():
         global conf
         warning('User configuration not loaded. Using default.')
         conf = type('default config', (object,), {})
-    if config_file == None:
+    if config_file is None:
         # Find configuration in predefined paths
         for cf in __all_config_files__:
             if os.path.isfile(os.path.expanduser(cf)):
                 config_file = os.path.expanduser(cf)
                 break
-    if config_file == None: # If no configuration find. Set empty config
+    if config_file is None:  # If no configuration find. Set empty config
         __set_empty_config__()
-    else: # else load configuration
+    else:  # else load configuration
         try:
             conf = imp.SourceFileLoader("conf", config_file).load_module()
         except Exception:
             traceback.print_exc()
             __set_empty_config__()
     # Set additional runtime configuration variables
-    if not 'verbose_level' in vars(conf):
+    if 'verbose_level' not in vars(conf):
         conf.verbose_level = 0
+
 
 def __conf_check_bad_type__(config):
     error('Bad configuration type of configuration option: ' + config,
-            ec = _EC_MISSING_CONFIGURATION)
+          ec=_EC_MISSING_CONFIGURATION)
+
+
 def __conf_check_missing__(config):
     error('Missing configuration option: ' + config,
-            ec = _EC_MISSING_CONFIGURATION)
+          ec=_EC_MISSING_CONFIGURATION)
+
+
 def __conf_check_no_dir__(directory):
     error('No directory exists for configuration option: ' + directory,
-            ec = _EC_MISSING_CONFIGURATION)
+          ec=_EC_MISSING_CONFIGURATION)
+
 
 def conf_checkserver(server):
     "Check and set configuration for server specified as agument."
     try:
-        srv = vars(conf)[server];
+        srv = vars(conf)[server]
     except KeyError:
-        error("No configuration class found", ec = _EC_MISSING_CONFIGURATION)
-    if not 'timeout' in vars(srv):
+        error("No configuration class found", ec=_EC_MISSING_CONFIGURATION)
+    if 'timeout' not in vars(srv):
         srv.timeout = 0
-    if type(srv.timeout) != int:
+    if isinstance(srv.timeout) != int:
         __conf_check_bad_type__('timeout')
-    if not 'directory' in vars(srv):
+    if 'directory' not in vars(srv):
         __conf_check_missing__('directory')
-    if type(srv.directory) != str:
+    if isinstance(srv.directory) != str:
         __conf_check_bad_type__('directory')
     srv.directory = os.path.expanduser(srv.directory)
     if not os.path.isdir(srv.directory):
         __conf_check_no_dir__('directory')
-    if not 'command' in vars(srv):
+    if 'command' not in vars(srv):
         __conf_check_missing__('command')
-    if type(srv.command) != str:
+    if isinstance(srv.command) != str:
         __conf_check_bad_type__('command')
-    if not 'statusdir' in vars(srv):
+    if 'statusdir' not in vars(srv):
         srv.statusdir = '/dev/shm/mcwrapper-' + server
-    if type(srv.statusdir) != str:
+    if isinstance(srv.statusdir) != str:
         __conf_check_bad_type__('statusdir')
     srv.statusdir = os.path.expanduser(srv.statusdir)
     return srv
 
-#################################################################################
+###############################################################################
 # Minecraft server
 
 __STATUSSTRINGS__ = {
@@ -134,17 +145,20 @@ __STATUSSTRINGS__ = {
     3: "Stopping",
     }
 
+
 class MCServer:
     def __init__(self, identifier, conf):
         self.identifier = identifier
         self.players = set()
         self.status = 0
         self.conf = conf
+        self.prc = None
+        self.shutdownTimeout = None
         self.inputPipe = self.conf.statusdir + '/input_pipe'
         self.statusFile = self.conf.statusdir + '/status'
         self.playersFile = self.conf.statusdir + '/players'
         self.pidfile = self.conf.statusdir + '/server.pid'
-        if type(self.conf.command) != str:
+        if isinstance(self.conf.command) != str:
             self.conf.command = ' '.join(self.conf.command)
         info("Server wrapper initializing")
         info("Folder: " + self.conf.directory, 1)
@@ -163,19 +177,20 @@ class MCServer:
             try:
                 os.kill(lpid, 0)
             except OSError:
-                warning("Detected forced termination of previous server wrapper "
-                        "instance.")
+                warning("Detected forced termination of previous server "
+                        "wrapper instance.")
             else:
                 error("Another wrapper is running with given identifier.",
-                        -1, _EC_SERVER_RUNNING)
+                      -1, _EC_SERVER_RUNNING)
         with open(self.statusFile, 'w') as f:
             f.write(__STATUSSTRINGS__[0] + '\n')
         with open(self.playersFile, 'w') as f:
             pass
         self.inputThread = Thread(target=self.__input_thread__,
-                daemon = True)
+                                  daemon=True)
         self.outpuThread = Thread(target=self.__output_thread__,
-                daemon = True)
+                                  daemon=True)
+
     def clean(self):
         info("Server wrapper clean.")
         try:
@@ -197,11 +212,14 @@ class MCServer:
         "Start execution of server"
         self.start()
         self.prc.wait()
+
     def start(self):
         "Start Minecraft server"
-        self.prc = subprocess.Popen(self.conf.command, stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True,
-                start_new_session=False, cwd=os.path.expanduser(self.conf.directory))
+        self.prc = subprocess.Popen(
+            self.conf.command, stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True,
+            start_new_session=False,
+            cwd=os.path.expanduser(self.conf.directory))
         with open(self.pidfile, "w") as f:
             f.write(str(self.prc.pid))
         self.status = 1
@@ -211,17 +229,20 @@ class MCServer:
             self.inputThread.start()
         if not self.outpuThread.is_alive():
             self.outpuThread.start()
+
     def stop(self):
         if self.running():
             self.prc.stdin.write(bytes("/stop\n", sys.getdefaultencoding()))
             self.prc.stdin.flush()
             self.__autoshutdown_disable__()
+
     def running(self):
         "Returns True if mc server is running. Othervise False."
-        if self.status != 0:
+        if self.status:
             return True
         else:
             return False
+
     def write_to_terminal(self, text):
         "Write to server terminal. If server not running it does nothing"
         if self.status == 2:
@@ -233,10 +254,12 @@ class MCServer:
             return False
 
     def __autoshutdown_enable__(self):
-        if (self.conf.timeout > 0):
-            info("Automatic shutdown after " + str(self.conf.timeout) + " min.")
+        if self.conf.timeout > 0:
+            info("Automatic shutdown after " + str(self.conf.timeout) +
+                 " min.")
             self.shutdownTimeout = Timer(self.conf.timeout * 60.0, self.stop)
-            self.shutdownTimeout.start();
+            self.shutdownTimeout.start()
+
     def __autoshutdown_disable__(self):
         try:
             self.shutdownTimeout.cancel()
@@ -244,12 +267,14 @@ class MCServer:
             info("Automatic shutdown disabled.")
         except AttributeError:
             pass
+
     def __user_join__(self, username):
         info("User '" + username + "' joined server.")
         self.players.add(username)
         with open(self.playersFile, 'a') as f:
             f.write(username + '\n')
         self.__autoshutdown_disable__()
+
     def __user_leave__(self, username):
         info("User '" + username + "' left server.")
         self.players.remove(username)
@@ -257,7 +282,7 @@ class MCServer:
             f.writelines(self.players)
             if self.players:
                 f.write('\n')
-        if (not self.players):
+        if not self.players:
             self.__autoshutdown_enable__()
 
     def __parse_line__(self, line):
@@ -280,15 +305,15 @@ class MCServer:
             name = line[len('[00:00:00] [Server thread/INFO]: '):]
             name = name[:name.index(' ')]
             self.__user_leave__(name)
+
     def __output_thread__(self):
         for linen in self.prc.stdout:
             line = linen.decode(sys.getdefaultencoding())
             info(line.rstrip(), 2, notime=True)
             self.__parse_line__(line.rstrip())
-        self.inputThread.stop()
-        self.status = 0
         with open(self.statusFile, 'w') as f:
             f.write(__STATUSSTRINGS__[0] + '\n')
+
     def __input_thread__(self):
         with open(self.inputPipe, 'r') as p:
             while True:
@@ -298,25 +323,28 @@ class MCServer:
                 else:
                     time.sleep(3)
 
+###############################################################################
 
-
-#################################################################################
 
 def wrapper_atexit():
     "This is called when wrapper is exiting"
     _mcserver.clean()
 
+
 def wrapper_toexit():
     "This function is called when system signalizes that mcwrapper should exit"
     _mcserver.stop()
 
+
 def __signal_term__(_signo, _stack_frame):
     wrapper_toexit()
 
+
 def print_help():
     print('mcwrapper [arguments...] IDENTIFIER')
-    print('  This script is executing Minecraft server and reads its output. From output is')
-    print('  extracted server status and list of online players.')
+    print('  This script is executing Minecraft server and reads its output.')
+    print('  From output isextracted server status and list of online')
+    print('  players.')
     print('')
     print(' arguments')
     print('   -h, --help')
@@ -330,10 +358,11 @@ def print_help():
     print('   --configfile')
     print('       prints used configuration file and exits.')
     print(' IDENTIFIER')
-    print('   Identifier for new server. This allows multiple servers running with this')
-    print('   wrapper.  Identifier is word without spaces and preferably without special')
-    print('   characters.')
+    print('   Identifier for new server. This allows multiple servers')
+    print('   running with this wrapper.  Identifier is word without')
+    print('   spaces and preferably without special characters.')
     sys.exit(_EC_OK)
+
 
 def print_conffile():
     if '__file__' in vars(conf):
@@ -341,6 +370,7 @@ def print_conffile():
     else:
         print("No configuration file used.")
     sys.exit(_EC_OK)
+
 
 if __name__ == '__main__':
     identifier = None
@@ -360,9 +390,9 @@ if __name__ == '__main__':
                 elif arg == '--quiet':
                     verbose_level += 1
                 elif arg == '--config':
-                    if use_config != None:
+                    if use_config is not None:
                         error('Config option is used multiple times',
-                                ec = _EC_ARG_MULTIPLE_CONFIG)
+                              ec=_EC_ARG_MULTIPLE_CONFIG)
                     else:
                         use_config = sys.argv[i]
                         i += 1
@@ -378,12 +408,13 @@ if __name__ == '__main__':
                     elif l == 'q':
                         verbose_level -= 1
                     else:
-                        error("Unknown short argument " + l, ec = _EC_ARG_UNKNOWN)
+                        error("Unknown short argument " + l,
+                              ec=_EC_ARG_UNKNOWN)
                 continue
-        if identifier == None:
+        if identifier is None:
             identifier = arg
             continue
-        error("Unknown argument: " + arg, ec = _EC_ARG_UNKNOWN)
+        error("Unknown argument: " + arg, ec=_EC_ARG_UNKNOWN)
     # Parsing args ends
 
     load_conf(use_config)
@@ -395,11 +426,10 @@ if __name__ == '__main__':
     # Set identifier if provided
     if identifier:
         conf.identifier = identifier
-    elif not "identifier" in vars(conf):
+    elif "identifier" not in vars(conf):
         print_help()
 
     server_conf = conf_checkserver(conf.identifier)
-    global _mcserver
     _mcserver = MCServer(conf.identifier, server_conf)
     signal.signal(signal.SIGTERM, __signal_term__)
     signal.signal(signal.SIGINT, __signal_term__)

@@ -9,7 +9,7 @@ cp ../example.conf mcwrapper.conf
 
 if [[ $PREPARED != "y" ]]; then
 	# Move to known directory
-	cd "$( dirname "${BASH_SOURCE[0]}" )"
+	cd "$( readlink -f "${BASH_SOURCE[0]}" )"
 
 	if [[ $MCSERVERS == "y" ]]; then
 		mkdir -p minecraft-server

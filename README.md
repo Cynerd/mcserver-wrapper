@@ -1,5 +1,6 @@
 MINECRAFT-WRAPPER
 =================
+[![Build Status](https://travis-ci.org/Cynerd/minecraft-wrapper.svg?branch=master)](https://travis-ci.org/Cynerd/minecraft-wrapper)  
 Python server wrapper for extracting informations about server status and list of
 online players.
 
