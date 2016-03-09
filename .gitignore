@@ -3,3 +3,4 @@
 __*__
 
 !.gitignore
+!.travis.yml
