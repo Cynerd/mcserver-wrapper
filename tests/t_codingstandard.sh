@@ -21,4 +21,4 @@ fi
 # This test is not part of standard check because of errors caused by dynamic variable
 # loading to configuration. But it should be run from time to time to found other mistakes
 #echo "Checking bugs and poor quality"
-#pylint --msg-template="{line}: [{msg_id}({symbol}), {obj}] {msg}" --reports=n ../mcwrapper
+#pylint --reports=n ../mcwrapper

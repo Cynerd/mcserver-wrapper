@@ -4,9 +4,6 @@ if [[ "$(basename -- "$0")" = "prepare.sh" ]]; then
 	exit 1
 fi
 
-# Write basic configuration
-cp ../example.conf mcwrapper.conf
-
 if [[ $PREPARED != "y" ]]; then
 	# Move to known directory
 	cd "$( readlink -f "${BASH_SOURCE[0]}" )"
