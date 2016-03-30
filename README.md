@@ -1,6 +1,5 @@
 MCSERVER-WRAPPER
 ================
-[![Build Status](https://travis-ci.org/Cynerd/minecraft-wrapper.svg?branch=master)](https://travis-ci.org/Cynerd/minecraft-wrapper)  
 Minecraft server wrapper written in Python3 that extracts server status and list
 of online players.
 

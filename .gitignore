@@ -1,6 +1,7 @@
 *~
 .*
 __*__
+*.egg-info
 
 !.gitignore
 !.travis.yml
