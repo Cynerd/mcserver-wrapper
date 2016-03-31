@@ -13,7 +13,7 @@ except (IOError, ImportError):
 
 setup(
     name='mcserver-wrapper',
-    version='0.3.6',
+    version='0.3.7',
     description="Minecraft server wrapper",
     long_description=long_description,
     url="https://github.com/Cynerd/mcserver-wrapper",

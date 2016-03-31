@@ -9,6 +9,16 @@ Requires:
 * Python3
 * Dependencies for Minecraft server (Java)
 
+For releasing are required also Pandoc and pypandoc to convert this file.
+
+Installation
+------------
+Installation is done using `pip`. Execute this command to install:
+```
+sudo pip install mcserver-wrapper
+```
+Expecting that Python3 is your default Python version, otherwise use `pip3`.
+
 MCWRAPPER
 ---------
 ### Usage
