@@ -61,6 +61,7 @@ def main():
 
     if not command:
         parser.print_help()
+        return
     if 'nogui' not in command:
         command.append('nogui')
 
