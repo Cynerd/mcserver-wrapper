@@ -6,7 +6,7 @@ of online players.
 Requires:
 -----------------
 * Unix-like OS (preferred an only tested is Linux)
-* Python3
+* Python3 (minimum version 3.3)
 * Dependencies for Minecraft server (Java)
 
 For releasing are required also Pandoc and pypandoc to convert this file.
