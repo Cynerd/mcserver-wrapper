@@ -1,0 +1,19 @@
+# Move this file to /etc/systemd/system and rename it to something like mc.service
+[Unit]
+Description=Minecraft server
+
+[Install]
+WantedBy=multi-user.target
+After=netwotk-online.target
+
+[Service]
+# Change this to your real user, under which Minecraft server will be executed or create minecraft user.
+User=minecraft
+# Update this path to directory where server will be hosted
+WorkingDirectory=~
+# Change any argument here and name of downloaded executable
+ExecStart=mcwrapper -spv java -Xmx1024M -Xms1024M -jar MinecraftServer.jar
+# If Minecraft server is most important thing on your server, make it less nice to other processes
+Nice=-5
+# When server falls, it is automatically restarted
+Restart=always
