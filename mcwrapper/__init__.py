@@ -35,12 +35,6 @@ __HELP_DESC__ = """
     """
 
 
-def reload():
-    "Reloads input files. Currently applicable only on mod."
-    if mcserver_mod is not None:
-        mcserver_mod.load_mods()
-
-
 def main():
     "Main function"
     global verbose_level
@@ -80,8 +74,6 @@ def main():
         command.append('nogui')
 
     alarm.init()
-    signal.signal(signal.SIGUSR1, reload)
-    signal.signal(signal.SIGUSR2, reload)  # probably can be used for something else in future
 
     global mcserver_wrapper
     mcserver_wrapper = MCWrapper(command, pfile, sfile)

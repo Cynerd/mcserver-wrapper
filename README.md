@@ -81,9 +81,4 @@ content don't have to be valid.
 
 #### Message of the day
 This prints to players various short messages in given interval. Message is from
-file passed as --mod-file and it's randomly selected line. This file is read on
-wrapper start, so if you edit it while it's running, no change will happen unless
-you send USR1 signal to mcwrapper server. You can use this simple script:
-```
-[ -f server.pid ] && kill -USR1 $(cat server.pid)
-```
+file passed as --mod-file and it's randomly selected line.
