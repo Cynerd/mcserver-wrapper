@@ -2,6 +2,7 @@
 import random
 
 from . import alarm
+from . import prints
 
 
 class MoD:
@@ -14,8 +15,12 @@ class MoD:
 
     def load_mods(self):
         "Loads messages from self.file"
-        with open(self.file, "r") as f:
-            self.lines = f.readlines()
+        try:
+            with open(self.file, "r") as f:
+                self.lines = f.readlines()
+        except OSError as e:
+            prints.warning("Loading of MoD file failed: " + str(e))
+            self.lines = []
 
     def __handler__(self):
         if len(self.lines) > 0:
