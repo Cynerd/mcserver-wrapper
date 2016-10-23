@@ -36,11 +36,11 @@ class MCWrapper:
             try:
                 os.kill(lpid, 0)
             except OSError:
-                prints.warning("Detected forced termination of previous server "
-                        "wrapper instance.")
+                prints.warning("Detected forced termination of previous server"
+                               " wrapper instance.")
             else:
-                prints.error("Another wrapper is running with given identifier.",
-                      -1, 1)
+                prints.error("Another wrapper is running with given "
+                             "identifier.", -1, 1)
         try:
             os.mkfifo(__INPUTPIPE__, 0o640)
         except FileExistsError:
@@ -75,11 +75,6 @@ class MCWrapper:
         except FileNotFoundError:
             pass
 
-    def execstart(self):
-        "Start execution of Minecraft server and hold until its exits"
-        self.start()
-        self.process.wait()
-
     def start(self):
         "Start Minecraft server"
         self.process = subprocess.Popen(
@@ -111,7 +106,7 @@ class MCWrapper:
     def write_to_terminal(self, text):
         "Write to server terminal. If server not running it does nothing"
         if self.status == 2:
-            prints.info("Input: " + text, 1)
+            prints.info("Input: " + text.rstrip(), 1)
             self.process.stdin.write(bytes(text, sys.getdefaultencoding()))
             self.process.stdin.flush()
             return True

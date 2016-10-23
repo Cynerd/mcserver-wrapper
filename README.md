@@ -1,7 +1,7 @@
 MCSERVER-WRAPPER
 ================
 Minecraft server wrapper written in Python3 that extracts server status and list
-of online players.
+of online players and more.
 
 Requires:
 -----------------
@@ -34,11 +34,16 @@ positional arguments:
   command             Command to be executed to start Minecraft server.
 
 optional arguments:
-  -h, --help          show this help message and exit
-  --verbose, -v       Increase verbose level of output
-  --quiet, -q         Decrease verbose level of output
-  --status-file, -s   Outputs server status to file "status"
-  --players-file, -p  Outputs list of online players to file "players"
+  -h, --help            show this help message and exit
+  --verbose, -v         Increase verbose level of output
+  --quiet, -q           Decrease verbose level of output
+  --status-file, -s     Outputs server status to file "status"
+  --players-file, -p    Outputs list of online players to file "players"
+  --mod-file MOD_FILE, -m MOD_FILE
+                        Prints periodically random line from given file as
+                        message of the day.
+  --mod-time MOD_TIME   Period used for message of the day in seconds. In
+                        default 900 (15 minutes).
 ```
 
 ### How it works
@@ -74,8 +79,11 @@ This file in in status directory and is named as `players`. If server is running
 it contains online players. Player name per line.  If server isn't running, it
 content don't have to be valid.
 
-MCWRAPPER-TERMINAL
-------------------
-This application is going to be used for interactive terminal access to minecraft
-server console. It should use latest minecraft server log as input and output will
-be pushed to input pipe of mcwrapper.  This app is currently in development.
+### Message of the day
+This prints to players various short messages in given interval. Message is from
+file passed as --mod-file and it's randomly selected line. This file is read on
+wrapper start, so if you edit it while it's running, no change will happen unless
+you send USR1 signal to mcwrapper server. You can use this simple script:
+```
+[ -f server.pid ] && kill -USR1 $(cat server.pid)
+```
