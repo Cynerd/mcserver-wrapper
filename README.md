@@ -79,7 +79,7 @@ This file in in status directory and is named as `players`. If server is running
 it contains online players. Player name per line.  If server isn't running, it
 content don't have to be valid.
 
-### Message of the day
+#### Message of the day
 This prints to players various short messages in given interval. Message is from
 file passed as --mod-file and it's randomly selected line. This file is read on
 wrapper start, so if you edit it while it's running, no change will happen unless

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-from os import path
+import os
 from setuptools import setup
 
-readme_file = path.join(path.abspath(path.dirname(__file__)), 'README.md')
+readme_file = os.path.join(os.path.abspath(os.path.dirname(__file__)),
+                           'README.md')
 long_description = ""
 try:
     import pypandoc
@@ -10,10 +11,9 @@ try:
 except (IOError, ImportError):
     print("Pandoc not found. Long_description conversion failure.")
 
-
 setup(
     name='mcserver-wrapper',
-    version='0.3.7',
+    version='0.4',
     description="Minecraft server wrapper",
     long_description=long_description,
     url="https://github.com/Cynerd/mcserver-wrapper",
@@ -24,9 +24,10 @@ setup(
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.2',
         'Programming Language :: Python :: 3.3',
         'Programming Language :: Python :: 3.4',
+        'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6',
         ],
     keywords='Minecraft wrapper server',
 
