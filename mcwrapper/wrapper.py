@@ -5,30 +5,21 @@ import subprocess
 import time
 from threading import Thread
 
-from .import prints 
-
-__STATUSSTRINGS__ = {
-    0: "Not running",
-    1: "Starting",
-    2: "Running",
-    3: "Stopping",
-    }
+from .import prints
 
 __INPUTPIPE__ = 'input_pipe'
-__STATUSFILE__ = 'status'
-__PLAYERSFILE__ = 'players'
 __PIDFILE__ = 'server.pid'
 
 
 class MCWrapper:
     "Minecraft server wrapper class"
-    def __init__(self, command, statusfile=False, playersfile=False):
-        self.players = set()
-        self.status = 0
+    def __init__(self, command):
         self.process = None
         self.command = command
-        self.statusfile = statusfile
-        self.plaersfile = playersfile
+        self._running = False
+        self._hook_start = []
+        self._hook_stop = []
+        self._hook_line = []
         prints.info("Server wrapper initializing")
         if os.path.isfile(__PIDFILE__):
             with open(__PIDFILE__) as file:
@@ -45,11 +36,6 @@ class MCWrapper:
             os.mkfifo(__INPUTPIPE__, 0o640)
         except FileExistsError:
             pass
-        if statusfile:
-            with open(__STATUSFILE__, 'w') as file:
-                file.write(__STATUSSTRINGS__[0] + '\n')
-        if playersfile:
-            open(__PLAYERSFILE__, 'w')
         self.inputthread = Thread(target=self.__input_thread__,
                                   daemon=True)
         self.outputhread = Thread(target=self.__output_thread__,
@@ -66,14 +52,6 @@ class MCWrapper:
             os.remove(__PIDFILE__)
         except FileNotFoundError:
             pass
-        try:
-            os.remove(__STATUSFILE__)
-        except FileNotFoundError:
-            pass
-        try:
-            os.remove(__STATUSFILE__)
-        except FileNotFoundError:
-            pass
 
     def start(self):
         "Start Minecraft server"
@@ -81,12 +59,11 @@ class MCWrapper:
             self.command, stdin=subprocess.PIPE,
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             start_new_session=False)
+        for h in self._hook_start:
+            h()
+        self._running = True
         with open(__PIDFILE__, "w") as file:
             file.write(str(self.process.pid))
-        self.status = 1
-        if self.statusfile:
-            with open(__STATUSFILE__, 'w') as file:
-                file.write(__STATUSSTRINGS__[1] + '\n')
         if not self.inputthread.is_alive():
             self.inputthread.start()
         if not self.outputhread.is_alive():
@@ -98,14 +75,15 @@ class MCWrapper:
             self.process.stdin.write(bytes(
                 "/stop\n", sys.getdefaultencoding()))
             self.process.stdin.flush()
+        self._running = False
 
     def running(self):
         "Returns True if mc server is running. Othervise False."
-        return bool(self.status)
+        return True
 
     def write_to_terminal(self, text):
         "Write to server terminal. If server not running it does nothing"
-        if self.status == 2:
+        if self._running:
             prints.info("Input: " + text.rstrip(), 1)
             self.process.stdin.write(bytes(text, sys.getdefaultencoding()))
             self.process.stdin.flush()
@@ -113,57 +91,36 @@ class MCWrapper:
         else:
             return False
 
-    def __user_join__(self, username):
-        prints.info("User '" + username + "' joined server.")
-        self.players.add(username)
-        if self.plaersfile:
-            with open(__PLAYERSFILE__, 'a') as file:
-                file.write(username + '\n')
+    def hook_start(self, handler):
+        self._hook_start.append(handler)
 
-    def __user_leave__(self, username):
-        prints.info("User '" + username + "' left server.")
-        self.players.remove(username)
-        if self.plaersfile:
-            with open(__PLAYERSFILE__, 'w') as file:
-                file.writelines(self.players)
-                if self.players:
-                    file.write('\n')
+    def hook_stop(self, handler):
+        self._hook_stop.append(handler)
+
+    def hook_line(self, contains, handler):
+        n = dict()
+        n["contains"] = contains
+        n["handler"] = handler
+        self._hook_line.append(n)
 
     def __parse_line__(self, line):
-        if ': Done' in line:
-            prints.info("Server start.")
-            self.status = 2
-            if self.statusfile:
-                with open(__STATUSFILE__, 'w') as file:
-                    file.write(__STATUSSTRINGS__[2] + '\n')
-        elif ': Stopping the server' in line:
-            prints.info("Server stop.")
-            self.status = 3
-            if self.statusfile:
-                with open(__STATUSFILE__, 'w') as file:
-                    file.write(__STATUSSTRINGS__[3] + '\n')
-        elif 'logged in with entity id' in line:
-            name = line[len('[00:00:00] [Server thread/INFO]: '):]
-            name = name[:name.index('[')]
-            self.__user_join__(name)
-        elif 'left the game' in line:
-            name = line[len('[00:00:00] [Server thread/INFO]: '):]
-            name = name[:name.index(' ')]
-            self.__user_leave__(name)
+        i = 0
+        while i < len(self._hook_line):
+            if self._hook_line[i]["contains"] in line:
+                self._hook_line[i]["handler"](line)
+            i += 1
 
     def __output_thread__(self):
         for linen in self.process.stdout:
             line = linen.decode(sys.getdefaultencoding())
             prints.info(line.rstrip(), 2, notime=True)
             self.__parse_line__(line.rstrip())
-        if self.statusfile:
-            with open(__STATUSFILE__, 'w') as file:
-                file.write(__STATUSSTRINGS__[0] + '\n')
 
     def __input_thread__(self):
         with open(__INPUTPIPE__, 'r') as pipe:
             while True:
                 line = pipe.readline().rstrip()
+                # TODO use polling
                 if line:
                     self.write_to_terminal(line + "\n")
                 else:

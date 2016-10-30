@@ -10,6 +10,8 @@ try:
     long_description = pypandoc.convert(readme_file, 'rst', format='md')
 except (IOError, ImportError):
     print("Pandoc not found. Long_description conversion failure.")
+except RuntimeError as e:
+    print("Pandoc conversion failed: " + str(e))
 
 setup(
     name='mcserver-wrapper',

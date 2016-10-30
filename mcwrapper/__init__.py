@@ -6,16 +6,27 @@ import argparse
 from . import prints
 from . import alarm
 from .wrapper import MCWrapper
+from .status import MCStatus
+from .players import MCPlayers
 from .mod import MoD
 
 mcserver_wrapper = None
+mcserver_status = None
+mcserver_players = None
 mcserver_mod = None
 
 
 def __wrapper_atexit__():
     "This is called when wrapper is exiting"
-    if mcserver_wrapper is not None:
-        mcserver_wrapper.clean()
+    toclean = (
+            mcserver_wrapper,
+            mcserver_status,
+            mcserver_players,
+            mcserver_mod
+            )
+    for c in toclean:
+        if c is not None:
+            c.clean()
 
 
 def __wrapper_toexit__():
@@ -75,11 +86,13 @@ def main():
 
     alarm.init()
 
-    global mcserver_wrapper
-    mcserver_wrapper = MCWrapper(command, pfile, sfile)
+    atexit.register(__wrapper_atexit__)
+    global mcserver_wrapper, mcserver_status, mcserver_players
+    mcserver_wrapper = MCWrapper(command)
     signal.signal(signal.SIGTERM, __signal_term__)
     signal.signal(signal.SIGINT, __signal_term__)
-    atexit.register(__wrapper_atexit__)
+    mcserver_status = MCStatus(mcserver_wrapper, sfile)
+    mcserver_players = MCPlayers(mcserver_wrapper, pfile)
 
     mcserver_wrapper.start()
     if mod_file is not None:

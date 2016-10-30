@@ -12,6 +12,9 @@ class MoD:
         self.file = file
         alarm.set("mod-time", period, self.__handler__, repeat=True)
 
+    def clean(self):
+        alarm.unset("mod-time")
+
     def __handler__(self):
         lines = []
         try:
