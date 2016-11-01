@@ -15,7 +15,7 @@ except RuntimeError as e:
 
 setup(
     name='mcserver-wrapper',
-    version='0.4.1',
+    version='0.5',
     description="Minecraft server wrapper",
     long_description=long_description,
     url="https://github.com/Cynerd/mcserver-wrapper",
