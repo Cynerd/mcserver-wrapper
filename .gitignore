@@ -4,6 +4,7 @@ __*__
 *.egg-info
 build
 dist
+srv
 
 !.gitignore
 !.travis.yml
