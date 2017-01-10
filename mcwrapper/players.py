@@ -13,7 +13,7 @@ class MCPlayers:
         self.wrapper = wrapper
         wrapper.hook_start(self.__reset__)
         wrapper.hook_stop(self.__reset__)
-        wrapper.hook_line('logged in with entity id', self.__user_join__)
+        wrapper.hook_line('joined the game', self.__user_join__)
         wrapper.hook_line('left the game', self.__user_leave__)
         self.file_export = file_export
         self.__reset__()
@@ -30,7 +30,7 @@ class MCPlayers:
 
     def __user_join__(self, line):
         username = line[len('[00:00:00] [Server thread/INFO]: '):]
-        username = username[:username.index('[')]
+        username = username[:username.index(' joined the game')]
         prints.info("User '" + username + "' joined server.")
         self.players.add(username)
         if self.file_export:
@@ -39,7 +39,7 @@ class MCPlayers:
 
     def __user_leave__(self, line):
         username = line[len('[00:00:00] [Server thread/INFO]: '):]
-        username = username[:username.index(' ')]
+        username = username[:username.index(' left the game')]
         prints.info("User '" + username + "' left server.")
         self.players.remove(username)
         if self.file_export:

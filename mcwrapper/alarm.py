@@ -61,6 +61,6 @@ def set(name, t, handler, repeat=False, arg=None):
 
 
 def unset(name):
-    if name in __update__:
+    if name in __alarms__:
         __alarms__.pop(name)
         __update__()
